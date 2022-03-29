@@ -1,3 +1,6 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
 def randomchoice2(arr):
     """
     This function takes in an array of probabilities and chooses an element index from that array accordingly:
