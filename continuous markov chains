@@ -1,0 +1,78 @@
+def randomchoice2(arr):
+    """
+    This function takes in an array of probabilities and chooses an element index from that array accordingly:
+    i.e say the array is [1/2,1/4,1/4] there would be a 50% chance of returning 0, and a 25% chance of returning 1 or 2.
+
+    my idea is to create an array containing intervals! so for the example above the array would be [1/2,3/4,1]
+    so if the random number lies in the interval [0,1/2) we get 0, [1/2,3/4) 1  or (3/4,1] 2
+    """
+    i = 0
+    sum = 0
+    rand = np.random.uniform(0,1)
+    while sum<rand:
+        sum += arr[i]
+        i+=1   
+    return i
+
+
+
+def continuous_markov_chain(initial_dist,generator,time, scatter = False,xlabel = 'Time', ylabel = 'Number of arrivals'):
+    """
+    A continuous markov chain is a spicy poisson process, where the rate is now dependent on the specific state that we are in.
+    To calculate this rate we look to the generator matrix. Now each time we think of going to another vertex we will have a random holding time,
+    this time follows an exponential(g_i) distribution where g _i is the total rate leaving a node, this makes sense as it is an exponential race.
+    Then from the transition matrix - which is the rates leaving a node divided by the total weight leaving the node (so that they add to 1), we
+    can find the probability of the chain increasing or decreasing!
+
+
+    The chain it's self X(t) gives the value of X after time t. Our initial distribution tells us the probability of initally being in any node in
+    the state space, with the fun quality that the components must sum to one.
+    """
+    shape = np.shape(generator)[0]
+    transition = np.zeros((shape,shape)) # Now we fill this matrix with the transition probabilities
+    # All the values that are in the '0th' column and in the 'mth' column are given below ( as these all have neighbours on both sides.)
+    for i in range(1,shape):
+        transition[0][i] = generator[0][i]/(-generator[0][0])
+    for i in range(shape-1):
+        transition[shape-1][i] = generator[shape-1][i]/(-generator[shape-1][shape-1])
+    # Now for the other values:
+    # For each row that isnt the 0th or the mth => we have to start our list at 1 and end it at m-1 rows, we fill in the values of each
+    # column from 0 -> m.
+    for row in range(1,shape-1):
+        for col in range(0,shape):
+            if row == col:
+                transition[row][col] = 0
+            else:
+                transition[row][col] = generator[row][col]/(-generator[row][row])
+
+    # Now that we have a transition matrix, we can define the jumps.
+    # Each jump has a waiting time of exp(-g[row,row]) and after that we use the transition matrix to decide where to move to.
+    # i.e the prob from going to state i to state j is transition[i][j]
+    # We choose the initial value of N with the initial distribution. We generate a random variable between zero and 1 and then define the following array
+    N_list = [randomchoice2(initial_dist)]
+    # Now that we have our initial value we can define our waiting/holding times.
+    arrival_times = [0] # Array of arrival/departure times.
+    timetrack = 0 # To assure that we only measure time for our interval [0,t]
+    step_count = 0 # Non discrete time nececitates that we index our N list with a counter for each event.
+    while timetrack < time:
+        t = np.random.exponential(-generator[N_list[step_count]][N_list[step_count]]) # We start each jump at vertex "N_list[step_count]" thus the total rate out of this is given by the inside of the random exponential.
+        if t + timetrack > time:
+            break
+        timetrack += t # cumulative time progression
+        arrival_times.append(timetrack)
+        step_count += 1
+        N_list.append(randomchoice2(transition[N_list[step_count-1]][:])) # We now use the row of the transition matrix.
+    if scatter: 
+        plt.scatter(np.array(arrival_times),np.array(N_list),s = 1)
+        plt.ylabel(ylabel)
+        plt.xlabel(xlabel)
+        plt.xlim(0,time)
+        plt.ylim(0,len(initial_dist))
+        for i in range(1,len(arrival_times)):
+            plt.vlines(x = arrival_times[i],ymin = N_list[i-1] , ymax = N_list[i]) # Plotting vertical lines.
+            plt.hlines(y = N_list[i-1],xmin = arrival_times[i-1],xmax=arrival_times[i]) # Plotting horizontal lines.
+        plt.vlines(x=arrival_times[0],ymin = 0, ymax = N_list[0])
+        plt.hlines(y=N_list[len(N_list)-1],xmin = arrival_times[len(arrival_times)-1], xmax = time)
+        plt.show()
+    else:
+        return np.array(N_list), np.array(arrival_times)
